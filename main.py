@@ -291,9 +291,8 @@ if 'data_audible_all' in dir():
     all_tone_indices = []
     # find indices of all tones in critical band
     for ii in range(len(data_audible_all)):
-        all_tone_indices = np.append(all_tone_indices,
-
-    np.array(range(int(data_audible_all[ii, 12]), int(data_audible_all[ii, 13] + 1))))
+        all_tone_indices = np.append(all_tone_indices, np.array(range(int(data_audible_all[ii, 12]), int(data_audible_all[ii, 13] + 1))))
+    
     all_tone_indices = np.array(list(map(int, all_tone_indices)))
 
     # find indices for tone in question only
@@ -318,11 +317,11 @@ if 'data_audible_all' in dir():
     arg4 = sum(10 ** (LS_secondary / 10)) ** 2
     sigmaL = 3
 
-    sigma_delL = ((arg1 / arg2 + arg3 / arg4) * sigmaL ** 2 + (4.34 * (deltaf / CB[Fton_idx]) ** 2)) ** 0.5
+    sigma_delL = ((arg1 / arg2 + arg3 / arg4) * sigmaL ** 2 + ((4.34 * (deltaf / CB[Fton_idx])) ** 2)) ** 0.5
     U = sigma_delL * 1.645
     data_out_1tone = np.append(data_out_1tone, U)
 
-    sigma_delL_all = ((arg1_all / arg2_all + arg3 / arg4) * sigmaL ** 2 + (4.34 * (deltaf / CB[Fton_idx]) ** 2)) ** 0.5
+    sigma_delL_all = ((arg1_all / arg2_all + arg3 / arg4) * sigmaL ** 2 + ((4.34 * (deltaf / CB[Fton_idx])) ** 2)) ** 0.5
     U_all = sigma_delL_all * 1.645
     data_out = np.append(data_out, U_all)
 
