@@ -37,6 +37,9 @@ L_i = np.array([49.4, 50.68, 50.09, 53.37, 44.47, 50.91, 51.41, 59.40,
                 64.54, 57.57, 51.02, 50.76, 59.93, 62.94, 58.49, 65.87, 62.66, 50.25,
                 51.32, 52.30, 52.58, 53.15, 67.04, 67.27, 57.40, 57.17, 52.56, 51.39,
                 52.49, 47.68, 51.26, 49.03, 61.42, 59.52, 48.43, 50.84, 48.20, 55.95]).reshape(-1, 1)
+# df_acous = pd.read_csv('20065 Annex E macro.csv')  # reading in data
+# F = df_acous['Frequenz (Hz)'].values[1:-1].reshape(-1, 1)
+# L_i = df_acous['Pegel (dB)'].values[1:-1].reshape(-1, 1)
 pref = 20e-6
 deltaf = 2.7
 deltaf_e = 1.5 * deltaf
@@ -59,6 +62,7 @@ deltaf_e = 1.5 * deltaf
 
 # Calculate critical bands
 CB = np.empty(shape=(len(F), 1), dtype=float)
+CB_edges_temp = np.empty(shape=(len(F), 2), dtype=float)
 CB_edges = np.empty(shape=(len(F), 2), dtype=float)
 CB_lines = np.empty(shape=(len(F), 2), dtype=float)
 a_v = np.empty(shape=(len(F), 1), dtype=float)
@@ -66,20 +70,22 @@ a_v = np.empty(shape=(len(F), 1), dtype=float)
 for ii in range(len(F)):
     a_v[ii] = -2 - np.log10(1 + (F[ii] / 502) ** 2.5)  # masking index
     CB[ii] = 25 + 75 * (1 + 1.4 * (F[ii] / 1000) ** 2) ** 0.69  # eq(2)
-    CB_edges[ii, 0] = -0.5 * CB[ii] + ((CB[ii] ** 2 + 4 * F[ii] ** 2) ** 0.5) / 2  # eq(4)
-    CB_edges[ii, 1] = min((CB_edges[ii, 0] + CB[ii]), F[-1])  # eq(5)
+    CB_edges_temp[ii, 0] = -0.5 * CB[ii] + ((CB[ii] ** 2 + 4 * F[ii] ** 2) ** 0.5) / 2  # eq(4)
+    CB_edges_temp[ii, 1] = min((CB_edges_temp[ii, 0] + CB[ii]), F[-1])  # eq(5)
     Ftemp1 = copy(F)
     Ftemp2 = copy(F)
-    Ftemp1[F < CB_edges[ii, 0]] = float("nan")
-    Ftemp2[F > CB_edges[ii, 1]] = float("nan")
-    arr_temp1 = Ftemp1 - CB_edges[ii, 0]
+    Ftemp1[F < CB_edges_temp[ii, 0]] = float("nan")
+    Ftemp2[F > CB_edges_temp[ii, 1]] = float("nan")
+    arr_temp1 = Ftemp1 - CB_edges_temp[ii, 0]
     min_p1 = np.nanmin(arr_temp1)
     f1_idx = np.nanargmin(arr_temp1)
-    arr_temp2 = CB_edges[ii, 1] - Ftemp2
+    arr_temp2 = CB_edges_temp[ii, 1] - Ftemp2
     min_p2 = np.nanmin(arr_temp2)
     f2_idx = np.nanargmin(arr_temp2)
     CB_lines[ii, 0] = f1_idx
     CB_lines[ii, 1] = f2_idx
+    CB_edges[ii, 0] = F[f1_idx]
+    CB_edges[ii, 1] = F[f2_idx]
 
 # 5.3.2 Determination of the mean narrow-band level L_S of the masking noise (only necessary when there is a tone)
 # This procedure also corresponds to Detailed Diagram 1
@@ -292,7 +298,7 @@ if 'data_audible_all' in dir():
     # find indices of all tones in critical band
     for ii in range(len(data_audible_all)):
         all_tone_indices = np.append(all_tone_indices, np.array(range(int(data_audible_all[ii, 12]), int(data_audible_all[ii, 13] + 1))))
-    
+
     all_tone_indices = np.array(list(map(int, all_tone_indices)))
 
     # find indices for tone in question only
@@ -315,13 +321,15 @@ if 'data_audible_all' in dir():
     arg2_all = sum(10 ** (LT_secondary_all / 10)) ** 2
     arg3 = sum((10 ** (LS_secondary / 10)) ** 2)
     arg4 = sum(10 ** (LS_secondary / 10)) ** 2
+    arg3x = sum((10 ** (L_S / 10)) ** 2)
+    arg4x = sum(10 ** (L_S / 10)) ** 2
     sigmaL = 3
 
-    sigma_delL = ((arg1 / arg2 + arg3 / arg4) * sigmaL ** 2 + ((4.34 * (deltaf / CB[Fton_idx])) ** 2)) ** 0.5
+    sigma_delL = ((arg1 / arg2 + arg3x / arg4x) * sigmaL ** 2 + ((4.34 * (deltaf / CB[Fton_idx])) ** 2)) ** 0.5
     U = sigma_delL * 1.645
     data_out_1tone = np.append(data_out_1tone, U)
 
-    sigma_delL_all = ((arg1_all / arg2_all + arg3 / arg4) * sigmaL ** 2 + ((4.34 * (deltaf / CB[Fton_idx])) ** 2)) ** 0.5
+    sigma_delL_all = ((arg1_all / arg2_all + arg3x / arg4x) * sigmaL ** 2 + ((4.34 * (deltaf / CB[Fton_idx])) ** 2)) ** 0.5
     U_all = sigma_delL_all * 1.645
     data_out = np.append(data_out, U_all)
 
