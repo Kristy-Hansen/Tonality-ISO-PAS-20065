@@ -37,7 +37,7 @@ L_i = np.array([49.4, 50.68, 50.09, 53.37, 44.47, 50.91, 51.41, 59.40,
                 64.54, 57.57, 51.02, 50.76, 59.93, 62.94, 58.49, 65.87, 62.66, 50.25,
                 51.32, 52.30, 52.58, 53.15, 67.04, 67.27, 57.40, 57.17, 52.56, 51.39,
                 52.49, 47.68, 51.26, 49.03, 61.42, 59.52, 48.43, 50.84, 48.20, 55.95]).reshape(-1, 1)
-# df_acous = pd.read_csv('20065 Annex E macro.csv')  # reading in data
+# df_acous = pd.read_csv('E:/python/ISO_PAS_tonality/20065 Annex E macro.csv')  # reading in data
 # F = df_acous['Frequenz (Hz)'].values[1:-1].reshape(-1, 1)
 # L_i = df_acous['Pegel (dB)'].values[1:-1].reshape(-1, 1)
 pref = 20e-6
@@ -62,7 +62,6 @@ deltaf_e = 1.5 * deltaf
 
 # Calculate critical bands
 CB = np.empty(shape=(len(F), 1), dtype=float)
-CB_edges_temp = np.empty(shape=(len(F), 2), dtype=float)
 CB_edges = np.empty(shape=(len(F), 2), dtype=float)
 CB_lines = np.empty(shape=(len(F), 2), dtype=float)
 a_v = np.empty(shape=(len(F), 1), dtype=float)
@@ -70,16 +69,16 @@ a_v = np.empty(shape=(len(F), 1), dtype=float)
 for ii in range(len(F)):
     a_v[ii] = -2 - np.log10(1 + (F[ii] / 502) ** 2.5)  # masking index
     CB[ii] = 25 + 75 * (1 + 1.4 * (F[ii] / 1000) ** 2) ** 0.69  # eq(2)
-    CB_edges_temp[ii, 0] = -0.5 * CB[ii] + ((CB[ii] ** 2 + 4 * F[ii] ** 2) ** 0.5) / 2  # eq(4)
-    CB_edges_temp[ii, 1] = min((CB_edges_temp[ii, 0] + CB[ii]), F[-1])  # eq(5)
+    CB_edges[ii, 0] = -0.5 * CB[ii] + ((CB[ii] ** 2 + 4 * F[ii] ** 2) ** 0.5) / 2  # eq(4)
+    CB_edges[ii, 1] = min((CB_edges[ii, 0] + CB[ii]), F[-1])  # eq(5)
     Ftemp1 = copy(F)
     Ftemp2 = copy(F)
-    Ftemp1[F < CB_edges_temp[ii, 0]] = float("nan")
-    Ftemp2[F > CB_edges_temp[ii, 1]] = float("nan")
-    arr_temp1 = Ftemp1 - CB_edges_temp[ii, 0]
+    Ftemp1[F < CB_edges[ii, 0]] = float("nan")
+    Ftemp2[F > CB_edges[ii, 1]] = float("nan")
+    arr_temp1 = Ftemp1 - CB_edges[ii, 0]
     min_p1 = np.nanmin(arr_temp1)
     f1_idx = np.nanargmin(arr_temp1)
-    arr_temp2 = CB_edges_temp[ii, 1] - Ftemp2
+    arr_temp2 = CB_edges[ii, 1] - Ftemp2
     min_p2 = np.nanmin(arr_temp2)
     f2_idx = np.nanargmin(arr_temp2)
     CB_lines[ii, 0] = f1_idx
@@ -93,6 +92,7 @@ for ii in range(len(F)):
 L_S = np.empty(shape=(len(F), 1), dtype=float)
 L_Stemp = copy(L_S)
 Ftemp = copy(F)
+#count = 1
 
 for ii in range(len(F)):
     idx_Tone = np.array(range(int(CB_lines[ii, 0]), int(CB_lines[ii, 1]) + 1))
@@ -105,6 +105,7 @@ for ii in range(len(F)):
     deltaL = 1
 
     while deltaL > 0.005 and idx_preTone >= 4 and idx_postTone >= 4:
+        #print(count)
         L_Stemp = 10 * np.log10(np.nanmean(10 ** (L_temp / 10))) + 10 * np.log10(deltaf / deltaf_e)
         L_temp[L_temp > (L_Stemp + 6)] = float("nan")
         deltaL = abs(L_Stemp1 - L_Stemp)
@@ -114,8 +115,12 @@ for ii in range(len(F)):
             idx_end = 0
         idx_preTone = len(L_temp[0:idx_end]) - sum(pd.isna(L_temp[0:idx_end]))
         idx_postTone = len(L_temp[index_fcenter + 1:-1]) - sum(pd.isna(L_temp[index_fcenter + 1: -1]))
+        #count = count + 1
 
     L_S[ii] = copy(L_Stemp)
+
+# et = time.time()
+# breakpoint()
 
 # 5.3.3 Determination of the tone level LT of a tone in a critical band
 Tone_Index = np.zeros((len(F), 1))
@@ -182,6 +187,7 @@ for ii in range(len(F_tonA)):  # considering the first tone and then subsequent 
         L_T[f_index[ii]] = 0
     else:
         idx_all = np.array(range(int(f_index[ii] - idx_break2), int(idx_break1 + f_index[ii]) + 1))
+        #breakpoint()
         idx_all_T[np.arange(0, len(idx_all)), ii] = idx_all
         if len(idx_all) == 1:
             L_T_temp = L_T_idx  # one tone
@@ -218,7 +224,7 @@ for ii in range(len(F_tonA)):  # considering the first tone and then subsequent 
 
 L_G = L_S + 10 * np.log10(CB / deltaf)  # EQ (12)
 deltaL = L_T - L_G - a_v
-audibleL = deltaL > 0
+audibleL = np.logical_and(deltaL > 0, L_T != 0)
 F_nan = ~np.isnan(Ftemp)
 audibleL_sharp = np.logical_and(audibleL, F_nan)
 
@@ -254,7 +260,8 @@ if sum(audibleL_sharp) > 0:
             # find all audible tones in critical band
             data_audible[ii, 10] = data_audible[ii, 9] - data_audible[ii, 3] - data_audible[ii, 4]  # tonal audibility
             maxdL = np.argmax(data_audible[idx2, 5])
-            data_audible[ii, 11] = data_audible[maxdL, 0]
+            reportFi = data_audible[idx2, 0]
+            data_audible[ii, 11] = reportFi[maxdL]
 
         if len(data_audible_all) != 0:
             for ii in range(len(data_audible_all)):
@@ -264,8 +271,8 @@ if sum(audibleL_sharp) > 0:
                 data_audible_all[ii, 13] = idx_all_T[idx_end, Fton_all_idx0[ii]]
 
         maxdL_m = np.argmax((data_audible[:, 10]))
-        data_out = data_audible[maxdL_m, [0, 10, 6, 7, 1, 9, 3, 4]]
-        data_out_1tone = data_audible[maxdL_m, [0, 5, 6, 7, 1, 2, 3, 4]]
+        data_out = data_audible[maxdL_m, [11, 10, 6, 7, 1, 9, 3, 4]]
+        data_out_1tone = data_audible[maxdL_m, [11, 5, 6, 7, 1, 2, 3, 4]]
     else:
         reportF = 0
         L_S = 0
@@ -295,8 +302,13 @@ if 'data_audible_all' in dir():
     f_index_ton = np.argwhere(data_audible_all[:, 0] == data_out[0])
 
     all_tone_indices = []
+    idx_CB_logical = np.logical_and(data_audible_all[:, 0] >= data_audible_all[f_index_ton, 6],
+                            data_audible_all[:, 0] <= data_audible_all[f_index_ton, 7])
+    idx_CB_coord = np.argwhere(idx_CB_logical)
+    idx_CB = idx_CB_coord[:, 1]
+
     # find indices of all tones in critical band
-    for ii in range(len(data_audible_all)):
+    for ii in idx_CB:
         all_tone_indices = np.append(all_tone_indices, np.array(range(int(data_audible_all[ii, 12]), int(data_audible_all[ii, 13] + 1))))
 
     all_tone_indices = np.array(list(map(int, all_tone_indices)))
@@ -314,6 +326,8 @@ if 'data_audible_all' in dir():
     LT_secondary_all = L_i[all_tone_indices]  # all lines classified as a tone in the critical band
     F_secondary_all = F[all_tone_indices]
 
+    idx_back = np.argwhere(np.logical_and(F >= data_audible_all[f_index_ton, 6], F <= data_audible_all[f_index_ton, 7]))
+
     # eq (27)
     arg1 = sum((10 ** (LT_secondary / 10)) ** 2)
     arg2 = sum(10 ** (LT_secondary / 10)) ** 2
@@ -321,8 +335,8 @@ if 'data_audible_all' in dir():
     arg2_all = sum(10 ** (LT_secondary_all / 10)) ** 2
     arg3 = sum((10 ** (LS_secondary / 10)) ** 2)
     arg4 = sum(10 ** (LS_secondary / 10)) ** 2
-    arg3x = sum((10 ** (L_S / 10)) ** 2)
-    arg4x = sum(10 ** (L_S / 10)) ** 2
+    arg3x = sum((10 ** (L_S[idx_back[:, 0]] / 10)) ** 2)
+    arg4x = sum(10 ** (L_S[idx_back[:, 0]] / 10)) ** 2
     sigmaL = 3
 
     sigma_delL = ((arg1 / arg2 + arg3x / arg4x) * sigmaL ** 2 + ((4.34 * (deltaf / CB[Fton_idx])) ** 2)) ** 0.5
